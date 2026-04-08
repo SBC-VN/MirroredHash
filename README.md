@@ -33,8 +33,8 @@ keyhash   - [optional] A hash key to use with key values.  (up to 32 characters)
 \
 valuehash - [optional] A hash key to use with the stored values. (up to 32 characters)\
 \
-vector    - [optional] The initialization vector to use with the keyhash/valuehash. (up to 32 characters)\ 
-\
+vector    - [optional] The initialization vector to use with the keyhash/valuehash. (up to 32 characters)
+
 ### Behavior
 The mirrored hash can be set to encrypt keys and/or values, or not encrypt either.   The 'keyhash' property specifies the value \
 to use when encrypting keys, and the 'valuehash' property specifies the value to use when encrypting values. \
