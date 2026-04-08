@@ -16,14 +16,14 @@ mhash.set(key,value);
 value = mhash.get(key);
 mhash.remove(key);
 ```
-\
+
 ```
 ## Options
 {
-    filepath:\<filepath\>,
-    [keyhash:\<hkey\>],
-    [vector:\<iv\>],
-    [valuehash:\<vkey\>]
+    filepath:<filepath>,
+    [keyhash:<hkey>],
+    [vector:<iv>],
+    [valuehash:<vkey>]
 }
 ```
 \
