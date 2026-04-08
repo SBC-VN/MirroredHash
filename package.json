@@ -1,0 +1,34 @@
+{
+  "name": "mirroredhash",
+  "version": "1.0.0",
+  "description": "Javascript Hash mirrored to filesystem",
+  "main": "./src/mirroredhash.cjs",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SBC-VN/MirroredHash.git"
+  },
+  "keywords": [
+    "Javascript",
+    "Mirrored",
+    "Hashtable",
+    "filesystem"
+  ],
+  "author": "V. Nestohr",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/SBC-VN/MirroredHash/issues"
+  },
+  "homepage": "https://github.com/SBC-VN/MirroredHash#readme",
+  "dependencies": {
+    "crypto-js": "^4.2.0"
+  },
+  "devDependencies": {
+    "jest": "^30.3.0"
+  }
+}
