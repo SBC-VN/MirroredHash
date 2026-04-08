@@ -8,10 +8,13 @@ jobs:
     runs-on: ubantu-latest
     steps:
       - name: Set new version
+        run: |
           npm version "${{vars.RELEASE_ID}}.${{ github.run_id }}"
 
       - name: Set token to the registry
+        run: |
           npm config set //registry.npmjs.org/:_authToken=${{ secrets.NPM_API_KEY }}
 
       - name: Publish the package
+        run: |
           npm publish
