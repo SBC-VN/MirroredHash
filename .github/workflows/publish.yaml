@@ -1,0 +1,17 @@
+name: Publish the MirrorHash package
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubantu-latest
+    steps:
+      - name: Set new version
+          npm version "${{vars.RELEASE_ID}}.${{ github.run_id }}"
+
+      - name: Set token to the registry
+          npm config set //registry.npmjs.org/:_authToken=${{ secrets.NPM_API_KEY }}
+
+      - name: Publish the package
+          npm publish
