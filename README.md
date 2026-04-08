@@ -18,12 +18,12 @@ mhash.remove(key);
 ```
 
 ## Options
-{\
-    filepath:<filepath>,\ 
-    [keyhash:<hkey>], \
-    [vector:<iv>], \
-    [valuehash:<vkey>]\
-}\
+{
+    filepath:\<filepath\>,
+    [keyhash:\<hkey\>],
+    [vector:\<iv\>],
+    [valuehash:\<vkey\>]
+}
 \
 filepath  - Path to a directory -or- file.  The filename will default to 'mhash.dat' if just a directory is given.\
 keyhash   - [optional] A hash key to use with key values.  (up to 32 characters)\
