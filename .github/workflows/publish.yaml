@@ -5,16 +5,19 @@ on:
 
 jobs:
   publish:
-    runs-on: ubantu-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Set new version
         run: |
           npm version "${{vars.RELEASE_ID}}.${{ github.run_id }}"
+        shell: bash
 
       - name: Set token to the registry
         run: |
           npm config set //registry.npmjs.org/:_authToken=${{ secrets.NPM_API_KEY }}
+        shell: bash
 
       - name: Publish the package
         run: |
           npm publish
+        shell: bash
