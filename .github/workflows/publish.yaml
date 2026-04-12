@@ -12,6 +12,8 @@ jobs:
         
       - name: Set new version
         run: |
+          git config --global user.email ${{ secrets.USER_MAIL }}
+          git config --global user.name ${{ secrets.USER_NAME }}
           npm version "${{vars.RELEASE_ID}}.${{ github.run_id }}"
         shell: bash
 
