@@ -4,6 +4,7 @@ const path = require('node:path');
 
 // Using 'proxy' around a hashtable
 // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy
+// https://medium.com/intrinsic-blog/javascript-object-property-descriptors-proxies-and-preventing-extension-1e1907aa9d10
 
 function getMirroredHash(options) {
     if (!options.hasOwnProperty('filepath')) {
@@ -86,8 +87,20 @@ function getMirroredHash(options) {
         save() {
             fs.writeFileSync(this.file, JSON.stringify(data,null,2));
         },
+        // Encodes a property name the same way it is stored in the underlying hashtable
+        encodeKey(key) {
+            return this.paddedkeykey ? CryptoJS.AES.encrypt(String(key), this.paddedkeykey, {iv: this.paddedvector}).toString() : key;
+        },
+        // Backs hasOwnProperty() on the mirrored hash: true if the key exists in the mirrored data
+        hasOwnKey(target, key) {
+            return Object.prototype.hasOwnProperty.call(target,key);
+        },
         // Intercepts reading a value
         get(target, key) {
+            // Serve hasOwnProperty ourselves so it checks the mirrored data instead of being looked up as a stored key
+            if (key === 'hasOwnProperty') {
+                return (property) => this.hasOwnKey(target, property);
+            }
             let eKey = this.paddedkey ? CryptoJS.AES.encrypt(key, this.paddedkeykey, {iv: this.paddedvector}).toString(): key;
             if (target.hasOwnProperty(eKey)) {
                 return this.paddedhashkey ? CryptoJS.AES.decrypt(target[eKey], this.paddedvaluekey, {iv: this.paddedvector}).toString(): target[eKey];
@@ -113,6 +126,19 @@ function getMirroredHash(options) {
                 delete target[eKey];
                 this.save();
             }
+        },
+        has(target, key) {
+            console.log(`has ${target} ${key}`);
+        },
+        getOwnPropertyDescriptor(target, name) {
+            return Reflect.getOwnPropertyDescriptor(target, name);
+            return {
+                value : target[name],
+                //use a logical set of descriptors:
+                enumerable : true,
+                configurable : true,
+                writable : true
+            };
         },
     };
 

@@ -149,3 +149,8 @@ test ("Get Keys", () => {
   let result = Object.keys(mhash);
   expect(result).toEqual(["one", "two", "three", "four"]);
 });
+
+test ("Has own property", () => {
+  let mhash = getMirroredHash({filepath:"c:/temp/mhash", valuehash:"xxxysaaerf", keyhash:"xxseaerarf", vector:"xyatqdw"});
+  expect(mhash.hasOwnProperty('one')).toEqual(true);
+});
