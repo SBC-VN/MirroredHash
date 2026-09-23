@@ -1,12 +1,12 @@
 # MirroredHash
 
-This code creates a JavaScript hashtable that is 'mirrored' to the filesystem.\
+This code creates a JavaScript hash table that is 'mirrored' to the filesystem.\
 The filesystem mirror data can be encrypted or in the clear.\
 \
-This is intended to be for when a light-weight persistant data store is needed, but not to the point where a table in a database is needed.
+This is intended for cases where a lightweight persistent data store is needed, but a database table would be excessive.
 
 ## Usage
-Pretty much like a regular javascript hashtable once its created..
+Pretty much like a regular JavaScript hash table once it is created.
 
 ```
 const { getMirroredHash } = require("./mirroredhash.cjs");
@@ -15,15 +15,12 @@ let mhash = getMirroredHash(<options>);
 
 mhash[key] = value;
 value = mhash[key];
-remove mhash[key];
-keys = Object(mhash).keys
+delete mhash[key];
+keys = Object.keys(mhash);
 ```
 
-> [!WARNING]
-> ```mhash.hasOwnProperty(key)``` does not work at this time.
-
-```
 ## Options
+```
 {
     filepath:<filepath>,
     [keyhash:<hkey>],
@@ -45,10 +42,9 @@ vector    - [optional] The initialization vector to use with the keyhash/valueha
 \
 data      - [optional] An initial hashtable.\
 \
-overwiteFile - [optional] Data from option should override any existing data from file.
+overwiteFile - [optional] Data from the option should override any existing data from the file.
 \
-overwriteData - [optional] Data from file should override any data given as an option. \
-\
+overwriteData - [optional] Data from the file should override any data given as an option. \
 
 ### Behavior
 <ul>
@@ -57,5 +53,6 @@ overwriteData - [optional] Data from file should override any data given as an o
 <li>The 'valuehash' property specifies the value to use when encrypting values.</li>
 <li>If they are null the corresponding item will not be encrypted and will be stored 'in the clear'.</li>
 <li>If either a keyhash or valuehash are specified, a vector is required.</li>
-<li>If initial data is provided and there's allready a mirror file - the code will throw an error unless
-it has been told how to handle the conflict (overwritedata/overwritefile)</li>
+<li>If initial data is provided and there is already a mirror file, the code will throw an error unless
+it has been told how to handle the conflict (overwriteData/overwiteFile).</li>
+</ul>

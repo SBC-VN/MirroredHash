@@ -1,151 +1,158 @@
 const fs = require('fs');
-const CryptoJS = require("crypto-js");
+const crypto = require('node:crypto');
 const path = require('node:path');
 
-// Using 'proxy' around a hashtable
-// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Proxy
-// https://medium.com/intrinsic-blog/javascript-object-property-descriptors-proxies-and-preventing-extension-1e1907aa9d10
+const hasOption = (options, name) => Object.prototype.hasOwnProperty.call(options, name);
+
+function deriveKey(secret, vector) {
+    return crypto.createHash('sha256').update(`${vector}\0${secret}`).digest();
+}
+
+function encryptKey(value, key) {
+    const nonce = crypto.createHmac('sha256', key).update(value).digest().subarray(0, 12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, nonce);
+    const ciphertext = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
+    return `k1:${nonce.toString('hex')}:${cipher.getAuthTag().toString('hex')}:${ciphertext.toString('base64url')}`;
+}
+
+function decryptKey(value, key) {
+    const [, nonceHex, tagHex, ciphertext] = value.split(':');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(nonceHex, 'hex'));
+    decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+    return Buffer.concat([
+        decipher.update(Buffer.from(ciphertext, 'base64url')),
+        decipher.final()
+    ]).toString('utf8');
+}
+
+function encryptValue(value, key) {
+    const nonce = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, nonce);
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) {
+        throw new TypeError('MirroredHash values must be JSON-serializable');
+    }
+    const ciphertext = Buffer.concat([cipher.update(serialized, 'utf8'), cipher.final()]);
+    return `v1:${nonce.toString('hex')}:${cipher.getAuthTag().toString('hex')}:${ciphertext.toString('base64url')}`;
+}
+
+function decryptValue(value, key) {
+    const [, nonceHex, tagHex, ciphertext] = value.split(':');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(nonceHex, 'hex'));
+    decipher.setAuthTag(Buffer.from(tagHex, 'hex'));
+    const plaintext = Buffer.concat([
+        decipher.update(Buffer.from(ciphertext, 'base64url')),
+        decipher.final()
+    ]).toString('utf8');
+    return JSON.parse(plaintext);
+}
 
 function getMirroredHash(options) {
-    if (!options.hasOwnProperty('filepath')) {
-        throw new Error("getMirroredHash: options missing filepath");
+    if (!options || !hasOption(options, 'filepath')) {
+        throw new Error('getMirroredHash: options missing filepath');
     }
 
-    // Must have vector if there's either a value or key hash
-    if ((options.hasOwnProperty('valuehash') ||
-         options.hasOwnProperty('keyhash')) &&
-         !options.hasOwnProperty('vector')){
-            throw new Error("getMirroredHash: options missing vector");
-         }
+    if ((hasOption(options, 'valuehash') || hasOption(options, 'keyhash')) && !hasOption(options, 'vector')) {
+        throw new Error('getMirroredHash: options missing vector');
+    }
 
-    // Define the file to be used, create it.
-    let filename = "";
-    let rootpath = "";
-    let indx = options.filepath.lastIndexOf('.');
-    if (indx > 0) {
+    let filename;
+    let rootpath;
+    if (options.filepath.lastIndexOf('.') > 0) {
         filename = path.basename(options.filepath);
         rootpath = path.dirname(options.filepath);
     }
     else {
-        // No filename was given, default to "mhash.dat"
-        filename = "mhash.dat";
+        filename = 'mhash.dat';
         rootpath = options.filepath;
     }
 
-    // Now we know the root path and filename, we can create them if they don't already exist.
     if (!fs.existsSync(rootpath)) {
-        fs.mkdirSync(rootpath, {recursive:true});
+        fs.mkdirSync(rootpath, { recursive: true });
     }
 
-    let hashfile = rootpath + path.sep + filename;
-
-    // Next, let's encode the hash keys for the hashtable values and.... well.. hashtable keys.  Yeah, different
-    // meanings of 'key' confuse things a bit.  But hey, english.
-    
-    // Convert the given hash and vector into 32 character strings.
-    let paddedvaluekey = null;
-    let paddedkeykey = null;       // Cue music to 'can can'
-    let paddedvector = null;
-
-    if (options.hasOwnProperty('valuehash')) {
-        paddedvaluekey = CryptoJS.enc.Hex.parse(options.valuehash.padEnd(32,"5").substring(0,32));
-    }
-
-    if (options.hasOwnProperty('keyhash')) {
-        paddedkeykey = CryptoJS.enc.Hex.parse(options.keyhash.padEnd(32,"5").substring(0,32));
-    }
-
-    if (options.hasOwnProperty('vector')) {
-        paddedvector = CryptoJS.enc.Hex.parse(options.vector.padEnd(32,"5").substring(0,32));
-    }
-    
-    // Set / Read the data for the hashtable, if any.
+    const hashfile = path.join(rootpath, filename);
+    const keyKey = hasOption(options, 'keyhash') ? deriveKey(String(options.keyhash), String(options.vector)) : null;
+    const valueKey = hasOption(options, 'valuehash') ? deriveKey(String(options.valuehash), String(options.vector)) : null;
+    const fileExists = fs.existsSync(hashfile);
     let data = {};
-    if (options.hasOwnProperty('data') && (options.hasOwnProperty('overwiteFile') || !fs.existsSync(hashfile))) {
-        // We've been given data to use and been told to overwrite any file -or- there is no file.
-        for (let [key, value] of Object.entries(options.data)) {
-            let eKey = paddedvaluekey ? CryptoJS.AES.encrypt(key, paddedvaluekey, {iv: this.paddedvector}).toString() : key;
-            let eValue = paddedvaluekey ? CryptoJS.AES.encrypt(value, paddedvaluekey, {iv: this.paddedvector}).toString(): value;
-            data[eKey] = eValue;
-        }
+
+    if (hasOption(options, 'data') && (hasOption(options, 'overwiteFile') || !fileExists)) {
+        data = {};
     }
-    else if (fs.existsSync(hashfile)) {
-        // We have a file.  But if we have data too that could be a problem.
-        if (options.hasOwnProperty('data') && !options.hasOwnProperty('overwriteData')) {
-            // We want to make sure the caller explicitly specifies that we should use the file even if data is specified.
-            throw new Error('getMirroredHash: data given in options AND file already exists.  There can be only one!')
+    else if (fileExists) {
+        if (hasOption(options, 'data') && !hasOption(options, 'overwriteData')) {
+            throw new Error('getMirroredHash: data given in options AND file already exists. There can be only one!');
         }
-        let filedata = fs.readFileSync(hashfile);
-        data = JSON.parse(filedata);
+        data = JSON.parse(fs.readFileSync(hashfile, 'utf8'));
     }
-   
+
+    const encodeKey = (key) => keyKey ? encryptKey(String(key), keyKey) : String(key);
+    const decodeKey = (key) => keyKey ? decryptKey(key, keyKey) : key;
+    const encodeValue = (value) => valueKey ? encryptValue(value, valueKey) : value;
+    const decodeValue = (value) => valueKey ? decryptValue(value, valueKey) : value;
+
     const handler = {
-        "file": hashfile,
-        "paddedkeykey": paddedkeykey,
-        "paddedvaluekey": paddedvaluekey,
-        "paddedvector": paddedvector,
+        file: hashfile,
         save() {
-            fs.writeFileSync(this.file, JSON.stringify(data,null,2));
+            fs.writeFileSync(this.file, JSON.stringify(data, null, 2));
         },
-        // Encodes a property name the same way it is stored in the underlying hashtable
-        encodeKey(key) {
-            return this.paddedkeykey ? CryptoJS.AES.encrypt(String(key), this.paddedkeykey, {iv: this.paddedvector}).toString() : key;
-        },
-        // Backs hasOwnProperty() on the mirrored hash: true if the key exists in the mirrored data
-        hasOwnKey(target, key) {
-            return Object.prototype.hasOwnProperty.call(target,key);
-        },
-        // Intercepts reading a value
-        get(target, key) {
-            // Serve hasOwnProperty ourselves so it checks the mirrored data instead of being looked up as a stored key
-            if (key === 'hasOwnProperty') {
-                return (property) => this.hasOwnKey(target, property);
+        get(target, property) {
+            if (property === 'hasOwnProperty') {
+                return (key) => Object.prototype.hasOwnProperty.call(target, encodeKey(key));
             }
-            let eKey = this.paddedkey ? CryptoJS.AES.encrypt(key, this.paddedkeykey, {iv: this.paddedvector}).toString(): key;
-            if (target.hasOwnProperty(eKey)) {
-                return this.paddedhashkey ? CryptoJS.AES.decrypt(target[eKey], this.paddedvaluekey, {iv: this.paddedvector}).toString(): target[eKey];
+            if (typeof property !== 'string') {
+                return Reflect.get(target, property);
             }
-            return null;
+            const encodedKey = encodeKey(property);
+            return Object.prototype.hasOwnProperty.call(target, encodedKey) ? decodeValue(target[encodedKey]) : null;
         },
-        // Intercepts setting a value
-        set(target, key, value) {
-            let eKey = this.paddedkey ? CryptoJS.AES.encrypt(key, this.paddedkeykey, {iv: this.paddedvector}).toString(): key;
-            let eValue = this.paddedhashkey ? CryptoJS.AES.encrypt(value, this.paddedvaluekey, {iv: this.paddedvector}).toString(): value;
-            target[eKey] = eValue;
+        set(target, property, value) {
+            if (typeof property !== 'string') {
+                return false;
+            }
+            target[encodeKey(property)] = encodeValue(value);
             this.save();
-            return true; // Success
+            return true;
         },
         ownKeys(target) {
-            return Object.keys(target).map(key => {
-                return this.paddedkey ? CryptoJS.AES.encrypt(key, this.paddedkeykey, {iv: this.paddedvector}).toString(): key;
-            });
+            return Object.keys(target).map(decodeKey);
         },
-        deleteProperty(target, key) {
-            let eKey = this.paddedkey ? CryptoJS.AES.encrypt(key, this.paddedkeykey, {iv: this.paddedvector}).toString(): key;
-            if (target.hasOwnProperty(eKey)) {
-                delete target[eKey];
+        deleteProperty(target, property) {
+            const encodedKey = encodeKey(property);
+            if (Object.prototype.hasOwnProperty.call(target, encodedKey)) {
+                delete target[encodedKey];
                 this.save();
             }
+            return true;
         },
-        has(target, key) {
-            console.log(`has ${target} ${key}`);
+        has(target, property) {
+            return Object.prototype.hasOwnProperty.call(target, encodeKey(property));
         },
-        getOwnPropertyDescriptor(target, name) {
-            return Reflect.getOwnPropertyDescriptor(target, name);
+        getOwnPropertyDescriptor(target, property) {
+            if (typeof property !== 'string') {
+                return Reflect.getOwnPropertyDescriptor(target, property);
+            }
+            const encodedKey = encodeKey(property);
+            if (!Object.prototype.hasOwnProperty.call(target, encodedKey)) {
+                return undefined;
+            }
             return {
-                value : target[name],
-                //use a logical set of descriptors:
-                enumerable : true,
-                configurable : true,
-                writable : true
+                enumerable: true,
+                configurable: true,
+                writable: true,
+                value: decodeValue(target[encodedKey])
             };
-        },
+        }
     };
 
-
-    //return new Proxy(data, traphandler);
-    let proxy = new Proxy(data, handler);
+    const proxy = new Proxy(data, handler);
+    if (hasOption(options, 'data') && (hasOption(options, 'overwiteFile') || !fileExists)) {
+        for (const [key, value] of Object.entries(options.data)) {
+            proxy[key] = value;
+        }
+    }
     return proxy;
 }
 
-module.exports = { getMirroredHash }
+module.exports = { getMirroredHash };
